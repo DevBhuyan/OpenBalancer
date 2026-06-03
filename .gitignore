@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+quickstart_curls_and_api_keys
+ROADMAP.md

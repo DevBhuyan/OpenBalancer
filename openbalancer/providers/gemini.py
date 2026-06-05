@@ -6,16 +6,28 @@ from typing import Any
 import httpx
 
 from openbalancer.models import ChatCompletionRequest, ProviderResult
-from openbalancer.providers.base import ProviderAdapter, ProviderError
+from openbalancer.providers.base import ProviderAdapter, ProviderError, resolve_model
 
 
 class GeminiProvider(ProviderAdapter):
     name = "gemini"
     supports_streaming = False
 
-    def __init__(self, *, api_key: str | None, default_model: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None,
+        default_model: str,
+        small_model: str | None = None,
+        large_model: str | None = None,
+        timeout_seconds: float,
+    ) -> None:
         self.api_key = api_key
-        self.default_model = default_model
+        self.model_profiles = {
+            "default": default_model,
+            "small": small_model or default_model,
+            "large": large_model or default_model,
+        }
         self.timeout_seconds = timeout_seconds
 
     @property
@@ -28,7 +40,7 @@ class GeminiProvider(ProviderAdapter):
         if request.stream:
             raise ProviderError(self.name, "Gemini streaming is not implemented in this MVP")
 
-        model = self.default_model if request.model == "auto" else request.model
+        model = resolve_model(request, self.model_profiles)
         body = self._to_gemini_body(request)
         started = time.perf_counter()
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:

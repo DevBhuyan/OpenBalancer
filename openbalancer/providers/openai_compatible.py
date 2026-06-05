@@ -20,12 +20,18 @@ class OpenAICompatibleProvider(ProviderAdapter):
         api_key: str | None,
         default_model: str,
         timeout_seconds: float,
+        small_model: str | None = None,
+        large_model: str | None = None,
         extra_headers: dict[str, str] | None = None,
     ) -> None:
         self.name = name
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
-        self.default_model = default_model
+        self.model_profiles = {
+            "default": default_model,
+            "small": small_model or default_model,
+            "large": large_model or default_model,
+        }
         self.timeout_seconds = timeout_seconds
         self.extra_headers = extra_headers or {}
 
@@ -45,7 +51,7 @@ class OpenAICompatibleProvider(ProviderAdapter):
         if not self.available:
             raise ProviderError(self.name, "missing API key")
 
-        body = request_body(request, self.default_model)
+        body = request_body(request, self.model_profiles)
         body["stream"] = False
         started = time.perf_counter()
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -66,7 +72,7 @@ class OpenAICompatibleProvider(ProviderAdapter):
         if not self.available:
             raise ProviderError(self.name, "missing API key")
 
-        body = request_body(request, self.default_model)
+        body = request_body(request, self.model_profiles)
         body["stream"] = True
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(

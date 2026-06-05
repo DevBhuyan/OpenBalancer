@@ -1,8 +1,12 @@
 from __future__ import annotations
-
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-
+from fastapi import (
+    FastAPI,
+)
+from fastapi.responses import (
+    JSONResponse,
+    StreamingResponse,
+    RedirectResponse
+)
 from openbalancer.models import ChatCompletionRequest
 from openbalancer.providers import ProviderError
 from openbalancer.router import LLMRouter
@@ -12,7 +16,16 @@ from openbalancer.settings import get_settings
 settings = get_settings()
 router = LLMRouter(settings)
 
-app = FastAPI(title=settings.app_name, version="0.1.0")
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    docs_url="/"
+)
+
+
+@app.get("/docs", include_in_schema=False)
+def redirect_to_root():
+    return RedirectResponse(url="/")
 
 
 @app.get("/health")
@@ -29,10 +42,46 @@ async def models() -> dict[str, object]:
     return {
         "object": "list",
         "data": [
-            {"id": settings.groq_model, "object": "model", "owned_by": "groq"},
-            {"id": settings.openrouter_model, "object": "model", "owned_by": "openrouter"},
-            {"id": settings.cerebras_model, "object": "model", "owned_by": "cerebras"},
-            {"id": settings.gemini_model, "object": "model", "owned_by": "gemini"},
+            {
+                "id": settings.groq_model,
+                "object": "model",
+                "owned_by": "groq"
+            },
+            {
+                "id": settings.openrouter_model,
+                "object": "model",
+                "owned_by": "openrouter"
+            },
+            {
+                "id": settings.cerebras_model,
+                "object": "model",
+                "owned_by": "cerebras"
+            },
+            {
+                "id": settings.hf_model,
+                "object": "model",
+                "owned_by": "huggingface"
+            },
+            {
+                "id": settings.gemini_model,
+                "object": "model",
+                "owned_by": "gemini"
+            },
+            {
+                "id": "auto",
+                "object": "model",
+                "owned_by": "openbalancer"
+            },
+            {
+                "id": "auto:small",
+                "object": "model",
+                "owned_by": "openbalancer"
+            },
+            {
+                "id": "auto:large",
+                "object": "model",
+                "owned_by": "openbalancer"
+            },
         ],
     }
 
@@ -45,4 +94,17 @@ async def chat_completions(request: ChatCompletionRequest):
         result = await router.chat(request)
         return result.payload
     except ProviderError as exc:
-        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+        return JSONResponse(
+            status_code=exc.status_code or 502,
+            content={
+                "error": {
+                    "message": str(exc),
+                    "type": "provider_error",
+                    "provider": exc.provider,
+                },
+                "openbalancer": {
+                    "provider": exc.provider,
+                    **exc.metadata,
+                },
+            },
+        )

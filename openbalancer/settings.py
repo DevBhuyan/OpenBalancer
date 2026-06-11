@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     provider_cooldown_seconds: float = 2.0
     provider_unavailable_cooldown_seconds: float = 5.0
 
+    # API Key Authentication Settings
+    require_api_key: bool = True
+    openbalancer_api_key: Optional[str] = None
+    auth_db_path: str = "sqlite:///./.data/openbalancer.db"
+    auth_cache_ttl_seconds: int = 300
+
     @classmethod
     def with_quickstart_defaults(cls) -> "Settings":
         settings = cls()

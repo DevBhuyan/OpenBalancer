@@ -4,4 +4,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 quickstart_curls_and_api_keys
-ROADMAP.md
+.data
+*.md
+*.log
+*.egg-info

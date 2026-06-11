@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  5 22:19:10 2026
+Integration tests using the OpenAI Python client.
 
-@author: dev
+These tests demonstrate using the OpenAI client library with OpenBalancer's
+OpenAI-compatible API endpoint with API key authentication.
 """
-
 
 import json
 from openai import OpenAI
+from config import get_api_key
 
 
 client = OpenAI(
-    api_key="dummy",  # ignored by your server
-    base_url="http://127.0.0.1:8000/v1"
+    api_key=get_api_key(),  # Use OpenBalancer API key
+    base_url="https://192.168.1.5:8000/v1"
 )
 
 

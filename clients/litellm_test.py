@@ -1,20 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  5 22:26:48 2026
+Integration tests using LiteLLM library.
 
-@author: dev
+LiteLLM provides a unified interface for multiple LLM providers.
+These tests demonstrate using LiteLLM with OpenBalancer's OpenAI-compatible
+API endpoint with API key authentication.
 """
 
-
 from litellm import completion
+from config import get_api_key
+
+
+API_KEY = get_api_key()
 
 
 def test_litellm_completion():
     response = completion(
         model="openai/auto",
         api_base="http://127.0.0.1:8000/v1",
-        api_key="dummy",
+        api_key=API_KEY,
         messages=[
             {
                 "role": "user",
@@ -31,7 +36,7 @@ def test_litellm_stream():
     response = completion(
         model="openai/auto",
         api_base="http://127.0.0.1:8000/v1",
-        api_key="dummy",
+        api_key=API_KEY,
         stream=True,
         messages=[
             {
@@ -55,7 +60,7 @@ def test_litellm_stream_sse():
     response = completion(
         model="openai/auto",
         api_base="http://127.0.0.1:8000/v1",
-        api_key="dummy",
+        api_key=API_KEY,
         stream=True,
         messages=[
             {

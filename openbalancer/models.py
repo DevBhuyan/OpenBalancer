@@ -19,8 +19,12 @@ class ChatCompletionRequest(BaseModel):
     max_completion_tokens: Optional[int] = None
     stream: bool = False
     provider: Optional[str] = None
-    routing: Literal["fallback", "fastest", "cheapest", "stable", "slow_and_stable", "balanced"] = "fallback"
-
+    routing: Literal["fallback",
+                     "fastest",
+                     "cheapest",
+                     "stable",
+                     "slow_and_stable",
+                     "balanced"] = "fallback"
     model_config = {"extra": "allow"}
 
 

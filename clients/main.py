@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  5 21:53:28 2026
+Integration test suite for OpenBalancer API.
 
-@author: dev
+This module runs all integration tests to verify OpenBalancer functionality
+with different client libraries (OpenAI, LiteLLM, requests) and configurations.
+
+All tests use OpenBalancer API key authentication loaded from environment
+or .env file (see config.py).
 """
-
 
 import os
 from contextlib import redirect_stdout

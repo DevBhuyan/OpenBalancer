@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  5 22:52:08 2026
+Load testing tool for OpenBalancer.
 
-@author: dev
+This script performs concurrent requests to stress test the API and collect
+statistics about provider load distribution and failure rates.
 """
-
 
 from collections import Counter
 import argparse
@@ -14,18 +14,20 @@ from tqdm import tqdm
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
+from config import get_api_headers
 
 
 provider_counts = Counter()
 failure_counts = Counter()
+api_headers = get_api_headers()
 
 
 def single_request(i):
 
     response = requests.post(
-        "http://127.0.0.1:8000/v1/chat/completions",
+        "https://192.168.1.5:8000/v1/chat/completions",
         json={
-            "model": "auto:small",
+            "model": "auto",
             "messages": [
                 {
                     "role": "user",
@@ -34,7 +36,9 @@ def single_request(i):
             ],
             "max_completion_tokens": 64
         },
-        timeout=120
+        headers=api_headers,
+        timeout=120,
+        verify=False
     )
 
     content_type = response.headers.get("content-type", "")
@@ -151,7 +155,7 @@ def load_test(n: int = 100,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run concurrent requests against OpenBalancer.")
-    parser.add_argument("requests", nargs="?", type=int, default=200)
+    parser.add_argument("requests", nargs="?", type=int, default=50)
     parser.add_argument("workers", nargs="?", type=int, default=500)
     args = parser.parse_args()
 

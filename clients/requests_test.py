@@ -1,21 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  5 22:47:34 2026
+Integration tests using the requests library.
 
-@author: dev
+These tests demonstrate making requests to OpenBalancer with API key authentication.
 """
 
 import requests
 import json
+from config import get_api_headers
 
 
-BASE_URL = 'http://127.0.0.1:8000/'
-url = f"{BASE_URL}/v1/chat/completions"
-headers = {
-    "accept": "application/json",
-    "Content-Type": "application/json"
-}
+BASE_URL = 'https://192.168.1.5:8000/'
+url = f"{BASE_URL}v1/chat/completions"
+headers = get_api_headers()
 
 
 def test_requests_completions():
@@ -52,6 +50,7 @@ def test_requests_completions():
 
 
 def test_requests_stream():
+
     payload = {
         "model": "auto",
         "messages": [
@@ -67,7 +66,8 @@ def test_requests_stream():
         url,
         json=payload,
         headers=headers,
-        stream=True
+        stream=True,
+        verify=False
     ) as response:
 
         response.raise_for_status()

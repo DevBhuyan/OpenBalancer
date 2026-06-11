@@ -6,5 +6,9 @@ __pycache__/
 quickstart_curls_and_api_keys
 .data
 *.md
+!README.md
 *.log
 *.egg-info
+openbalancer.egg-info/
+*.crt
+*.key

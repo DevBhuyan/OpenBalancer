@@ -68,6 +68,31 @@ class OpenAICompatibleProvider(ProviderAdapter):
         payload.setdefault("openbalancer", {})["provider"] = self.name
         return ProviderResult(provider=self.name, payload=payload, latency_ms=latency_ms)
 
+    async def list_models(self) -> list[str]:
+        if not self.available:
+            return []
+
+        async with httpx.AsyncClient(timeout=min(self.timeout_seconds, 8.0)) as client:
+            response = await client.get(
+                f"{self.base_url}/models",
+                headers=self._headers(),
+            )
+        if response.status_code >= 400:
+            raise ProviderError(self.name, response.text, response.status_code)
+
+        payload = response.json()
+        models = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(models, list):
+            return []
+
+        ids: list[str] = []
+        for model in models:
+            if isinstance(model, dict) and isinstance(model.get("id"), str):
+                ids.append(model["id"])
+            elif isinstance(model, str):
+                ids.append(model)
+        return ids
+
     async def stream_chat(self, request: ChatCompletionRequest) -> AsyncIterator[bytes]:
         if not self.available:
             raise ProviderError(self.name, "missing API key")

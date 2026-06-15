@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import time
-from functools import lru_cache
-from typing import Optional
+import json
 
 from fastapi import HTTPException, Request
 
 from openbalancer.auth.db import DatabaseManager
 from openbalancer.auth.exceptions import (
     InvalidAPIKeyError,
-    MissingAPIKeyError,
 )
-from openbalancer.auth.keygen import extract_api_key_from_header, hash_api_key, verify_api_key
+from openbalancer.auth.keygen import extract_api_key_from_header, hash_api_key
 
 
 class APIKeyValidator:
@@ -28,7 +26,7 @@ class APIKeyValidator:
         """
         self.db_manager = db_manager
         self.cache_ttl_seconds = cache_ttl_seconds
-        self.cache: dict[str, tuple[bool, float]] = {}  # key_hash -> (is_valid, timestamp)
+        self.cache: dict[str, tuple[dict | None, float]] = {}  # key_hash -> (auth_info, timestamp)
     
     def validate(self, api_key: str) -> dict:
         """Validate an API key and return provider credentials.
@@ -48,32 +46,45 @@ class APIKeyValidator:
         
         # Check cache first
         if key_hash in self.cache:
-            is_valid, timestamp = self.cache[key_hash]
+            auth_info, timestamp = self.cache[key_hash]
             if time.time() - timestamp < self.cache_ttl_seconds:
-                if is_valid:
-                    # Update last_used timestamp in DB (non-blocking)
-                    self.db_manager.update_last_used(key_hash)
-                    return {"key_hash": key_hash}
+                if auth_info:
+                    if auth_info.get("source") == "user":
+                        self.db_manager.update_user_api_key_last_used(key_hash)
+                    else:
+                        self.db_manager.update_last_used(key_hash)
+                    return auth_info
                 else:
                     raise InvalidAPIKeyError("API key is invalid")
-        
-        # Cache miss or expired - query database
+
+        # Cache miss or expired - query admin/bootstrap keys first.
         record = self.db_manager.get_key_by_hash(key_hash)
-        if not record:
-            self.cache[key_hash] = (False, time.time())
-            raise InvalidAPIKeyError("API key not found")
-        
-        # Valid key - cache it
-        self.cache[key_hash] = (True, time.time())
-        
-        # Update last_used timestamp in DB (non-blocking)
-        self.db_manager.update_last_used(key_hash)
-        
-        return {
-            "key_hash": key_hash,
-            "key_id": record.id,
-            "provider_credentials": record.provider_credentials,
-        }
+        if record:
+            auth_info = {
+                "key_hash": key_hash,
+                "key_id": record.id,
+                "source": "admin",
+                "provider_credentials": json.loads(record.provider_credentials),
+            }
+            self.cache[key_hash] = (auth_info, time.time())
+            self.db_manager.update_last_used(key_hash)
+            return auth_info
+
+        user_record = self.db_manager.get_user_api_key_by_hash(key_hash)
+        if user_record:
+            auth_info = {
+                "key_hash": key_hash,
+                "key_id": user_record.id,
+                "user_id": user_record.user_id,
+                "source": "user",
+                "provider_credentials": json.loads(user_record.provider_credentials),
+            }
+            self.cache[key_hash] = (auth_info, time.time())
+            self.db_manager.update_user_api_key_last_used(key_hash)
+            return auth_info
+
+        self.cache[key_hash] = (None, time.time())
+        raise InvalidAPIKeyError("API key not found")
     
     def clear_cache(self) -> None:
         """Clear the in-memory cache."""

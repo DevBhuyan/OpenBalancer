@@ -92,6 +92,10 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class ProviderCredentialsResponse(MessageResponse):
+    api_key: Optional[str] = None
+
+
 # Constants
 AVAILABLE_PROVIDERS = {
     "groq": {"display_name": "Groq", "env_var": "GROQ_API_KEY"},
@@ -170,12 +174,12 @@ async def get_user_provider_keys(
     }
 
 
-@router.post("/user/provider-keys")
+@router.post("/user/provider-keys", response_model=ProviderCredentialsResponse)
 async def update_user_provider_keys(
     request: ProviderCredentialsRequest,
     current_user: User = Depends(get_current_user),
     db: DatabaseManager = Depends(get_db_manager)
-) -> MessageResponse:
+) -> ProviderCredentialsResponse:
     """Update user's provider API keys.
     
     Args:
@@ -200,18 +204,39 @@ async def update_user_provider_keys(
     
     # Check if user already has an API key
     user_api_keys = db.get_user_api_keys(current_user.id)
+    api_key = None
     
     if user_api_keys:
         # Update existing credentials
-        db.update_user_provider_credentials(current_user.id, provider_creds)
+        user_api_key = user_api_keys[0]
+        api_key = user_api_key.openbalancer_api_key
+        key_hash = None
+        if not api_key:
+            api_key = generate_api_key()
+            key_hash = hash_api_key(api_key)
+        db.update_user_provider_credentials(
+            current_user.id,
+            provider_creds,
+            key_hash=key_hash,
+            openbalancer_api_key=api_key,
+        )
     else:
         # Create new API key for user
         api_key = generate_api_key()
         key_hash = hash_api_key(api_key)
         key_id = str(uuid.uuid4())
-        db.create_user_api_key(key_id, current_user.id, key_hash, provider_creds)
+        db.create_user_api_key(
+            key_id,
+            current_user.id,
+            key_hash,
+            provider_creds,
+            openbalancer_api_key=api_key,
+        )
     
-    return MessageResponse(message="Provider credentials updated successfully")
+    return ProviderCredentialsResponse(
+        message="Provider credentials updated successfully",
+        api_key=api_key,
+    )
 
 
 @router.get("/user/openbalancer-key", response_model=OpenBalancerKeyResponse)
@@ -242,13 +267,15 @@ async def get_user_openbalancer_key(
     # Get the most recent API key
     user_api_key = user_api_keys[0]
     
-    # Get the plaintext key from the request (this would normally be stored in a secure way)
-    # For now, we'll generate a new one if needed
-    # In production, you would retrieve this from a secure vault
-    api_key = generate_api_key()  # This would be the actual stored key
+    api_key = user_api_key.openbalancer_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This user key was created before key retrieval was supported. Please save provider credentials again to rotate it.",
+        )
     
     return OpenBalancerKeyResponse(
-        api_key=api_key,  # In production, retrieve the actual key
+        api_key=api_key,
         created_at=user_api_key.created_at.isoformat(),
         last_used=user_api_key.last_used.isoformat() if user_api_key.last_used else None,
     )
@@ -304,7 +331,12 @@ async def get_quickstart_code(
             detail="Please add provider credentials first",
         )
     
-    api_key = "obk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # Placeholder
+    api_key = user_api_keys[0].openbalancer_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This user key was created before key retrieval was supported. Please save provider credentials again to rotate it.",
+        )
     
     snippets = {
         "curl": f'''curl -X POST http://localhost:8000/v1/chat/completions \\

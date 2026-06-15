@@ -34,6 +34,9 @@ class ProviderAdapter(ABC):
     async def chat(self, request: ChatCompletionRequest) -> ProviderResult:
         raise NotImplementedError
 
+    async def list_models(self) -> list[str]:
+        return []
+
     async def stream_chat(self, request: ChatCompletionRequest) -> AsyncIterator[bytes]:
         raise ProviderError(self.name, f"{self.name} does not support streaming in this MVP")
 

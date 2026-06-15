@@ -118,6 +118,33 @@ class GeminiProvider(ProviderAdapter):
             "openbalancer": {"provider": self.name},
         }
 
+    async def list_models(self) -> list[str]:
+        if not self.available:
+            return []
+
+        async with httpx.AsyncClient(timeout=min(self.timeout_seconds, 8.0)) as client:
+            response = await client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                headers={"X-goog-api-key": self.api_key or ""},
+            )
+        if response.status_code >= 400:
+            raise ProviderError(self.name, response.text, response.status_code)
+
+        payload = response.json()
+        models = payload.get("models") if isinstance(payload, dict) else None
+        if not isinstance(models, list):
+            return []
+
+        ids: list[str] = []
+        for model in models:
+            if not isinstance(model, dict):
+                continue
+            name = model.get("name")
+            methods = model.get("supportedGenerationMethods") or []
+            if isinstance(name, str) and "generateContent" in methods:
+                ids.append(name.removeprefix("models/"))
+        return ids
+
     def _message_text(self, content: str | list[dict[str, Any]] | None) -> str:
         if content is None:
             return ""

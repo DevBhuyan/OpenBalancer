@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, String, Text, Boolean, create_engine, inspect, ForeignKey
+from sqlalchemy import Column, DateTime, String, Text, Boolean, create_engine, inspect, ForeignKey, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from openbalancer.auth.exceptions import DatabaseError
@@ -59,6 +59,7 @@ class UserAPIKey(Base):
     id = Column(String(36), primary_key=True)  # UUID
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     openbalancer_key_hash = Column(String(64), unique=True, nullable=False, index=True)  # SHA-256 hash
+    openbalancer_api_key = Column(String(64), nullable=True)  # Plaintext key for local MVP/dashboard display
     provider_credentials = Column(Text, nullable=False)  # JSON string with provider API keys
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_used = Column(DateTime, nullable=True)
@@ -114,12 +115,24 @@ class DatabaseManager:
                     os.makedirs(db_dir, exist_ok=True)
             
             self.engine = create_engine(self.db_path, echo=False)
-            self.SessionLocal = sessionmaker(bind=self.engine)
+            self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
             
             # Create tables if they don't exist
             Base.metadata.create_all(self.engine)
+            self._ensure_user_api_key_columns()
         except Exception as e:
             raise DatabaseError(f"Failed to initialize database: {str(e)}")
+
+    def _ensure_user_api_key_columns(self) -> None:
+        """Apply tiny SQLite-compatible migrations for existing local databases."""
+        inspector = inspect(self.engine)
+        if "user_api_keys" not in inspector.get_table_names():
+            return
+
+        columns = {column["name"] for column in inspector.get_columns("user_api_keys")}
+        if "openbalancer_api_key" not in columns:
+            with self.engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user_api_keys ADD COLUMN openbalancer_api_key VARCHAR(64)"))
     
     def get_session(self):
         """Get a new database session."""
@@ -143,6 +156,8 @@ class DatabaseManager:
                     APIKeyRecord.key_hash == key_hash,
                     APIKeyRecord.enabled == "Y"
                 ).first()
+                if record:
+                    session.expunge(record)
                 return record
             finally:
                 session.close()
@@ -282,6 +297,8 @@ class DatabaseManager:
                     User.email == email,
                     User.is_active == True
                 ).first()
+                if user:
+                    session.expunge(user)
                 return user
             finally:
                 session.close()
@@ -304,6 +321,8 @@ class DatabaseManager:
                     User.id == user_id,
                     User.is_active == True
                 ).first()
+                if user:
+                    session.expunge(user)
                 return user
             finally:
                 session.close()
@@ -358,6 +377,8 @@ class DatabaseManager:
                     UserSession.is_valid == True,
                     UserSession.expires_at > datetime.utcnow()
                 ).first()
+                if user_session:
+                    session.expunge(user_session)
                 return user_session
             finally:
                 session.close()
@@ -389,7 +410,8 @@ class DatabaseManager:
         key_id: str,
         user_id: str,
         key_hash: str,
-        provider_credentials: dict
+        provider_credentials: dict,
+        openbalancer_api_key: str | None = None
     ) -> UserAPIKey:
         """Create a new API key for a user.
         
@@ -398,6 +420,7 @@ class DatabaseManager:
             user_id: ID of the user
             key_hash: SHA-256 hash of the API key
             provider_credentials: Dict of provider API keys
+            openbalancer_api_key: Plaintext OpenBalancer API key for local MVP retrieval
             
         Returns:
             The created UserAPIKey object
@@ -409,6 +432,7 @@ class DatabaseManager:
                     id=key_id,
                     user_id=user_id,
                     openbalancer_key_hash=key_hash,
+                    openbalancer_api_key=openbalancer_api_key,
                     provider_credentials=json.dumps(provider_credentials)
                 )
                 session.add(user_api_key)
@@ -435,6 +459,8 @@ class DatabaseManager:
                     UserAPIKey.openbalancer_key_hash == key_hash,
                     UserAPIKey.enabled == True
                 ).first()
+                if user_api_key:
+                    session.expunge(user_api_key)
                 return user_api_key
             finally:
                 session.close()
@@ -456,7 +482,9 @@ class DatabaseManager:
                 keys = session.query(UserAPIKey).filter(
                     UserAPIKey.user_id == user_id,
                     UserAPIKey.enabled == True
-                ).all()
+                ).order_by(UserAPIKey.created_at.desc()).all()
+                for key in keys:
+                    session.expunge(key)
                 return keys
             finally:
                 session.close()
@@ -466,13 +494,17 @@ class DatabaseManager:
     def update_user_provider_credentials(
         self,
         user_id: str,
-        provider_credentials: dict
+        provider_credentials: dict,
+        key_hash: str | None = None,
+        openbalancer_api_key: str | None = None,
     ) -> Optional[UserAPIKey]:
         """Update provider credentials for a user's active API key.
         
         Args:
             user_id: ID of the user
             provider_credentials: Updated dict of provider credentials
+            key_hash: Optional replacement SHA-256 hash
+            openbalancer_api_key: Optional replacement plaintext key
             
         Returns:
             The updated UserAPIKey object, or None if not found
@@ -486,6 +518,10 @@ class DatabaseManager:
                 ).first()
                 if user_api_key:
                     user_api_key.provider_credentials = json.dumps(provider_credentials)
+                    if key_hash:
+                        user_api_key.openbalancer_key_hash = key_hash
+                    if openbalancer_api_key:
+                        user_api_key.openbalancer_api_key = openbalancer_api_key
                     session.commit()
                 return user_api_key
             finally:

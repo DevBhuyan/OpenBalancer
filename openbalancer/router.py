@@ -186,7 +186,7 @@ class LLMRouter:
                     continue
 
                 try:
-                    result = await provider.chat(request)
+                    result = await provider.chat(self._request_for_provider(request, provider.name))
                     self._mark_success(provider.name, result.latency_ms)
                     return result
                 except ProviderError as exc:
@@ -230,7 +230,7 @@ class LLMRouter:
                 continue
 
             try:
-                async for chunk in provider.stream_chat(request):
+                async for chunk in provider.stream_chat(self._request_for_provider(request, provider.name)):
                     yield chunk
                 self._mark_success(
                     provider.name, self.latency_ms.get(provider.name, 0))
@@ -252,6 +252,11 @@ class LLMRouter:
         )
 
     def _candidate_providers(self, request: ChatCompletionRequest) -> list[ProviderAdapter]:
+        qualified_provider = self._qualified_model_provider(request.model)
+        if qualified_provider:
+            provider = self.providers.get(qualified_provider)
+            return [provider] if provider and provider.available else []
+
         if request.provider:
             provider = self.providers.get(request.provider)
             return [provider] if provider else []
@@ -272,6 +277,18 @@ class LLMRouter:
             for name in ordered_names
             if name in self.providers and self.providers[name].available
         ]
+
+    def _qualified_model_provider(self, model: str) -> Optional[str]:
+        provider, separator, _model = model.partition("/")
+        if separator and provider in self.providers:
+            return provider
+        return None
+
+    def _request_for_provider(self, request: ChatCompletionRequest, provider: str) -> ChatCompletionRequest:
+        prefix = f"{provider}/"
+        if request.model.startswith(prefix):
+            return request.model_copy(update={"model": request.model[len(prefix):]})
+        return request
 
     def _mark_success(self, provider: str, latency_ms: float) -> None:
         self.failures[provider] = 0

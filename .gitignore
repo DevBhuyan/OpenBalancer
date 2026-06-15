@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 quickstart_curls_and_api_keys
 .data
+test_credentials
 *.md
 !README.md
 *.log

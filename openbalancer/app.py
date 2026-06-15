@@ -6,6 +6,7 @@ from fastapi import (
     FastAPI,
     Depends,
     Request,
+    Query,
 )
 from fastapi.responses import (
     JSONResponse,
@@ -31,11 +32,66 @@ from openbalancer.routers.dashboard import router as dashboard_router
 settings = get_settings()
 router = LLMRouter(settings)
 
+
+def router_for_auth(auth_info: dict) -> LLMRouter:
+    """Use user-provided credentials for authenticated BYOK requests."""
+    provider_credentials = auth_info.get("provider_credentials")
+    if not provider_credentials:
+        return router
+
+    request_settings = settings.model_copy()
+    request_settings.groq_api_key = provider_credentials.get("GROQ_API_KEY")
+    request_settings.openrouter_api_key = provider_credentials.get("OPENROUTER_API_KEY")
+    request_settings.cerebras_api_key = provider_credentials.get("CEREBRAS_API_KEY")
+    request_settings.gemini_api_key = provider_credentials.get("GEMINI_API_KEY")
+    request_settings.hf_api_key = provider_credentials.get("HF_API_KEY")
+    return LLMRouter(request_settings)
+
 # Initialize authentication system
 db_manager = DatabaseManager(settings.auth_db_path)
 db_manager.initialize()
 api_key_validator = APIKeyValidator(
     db_manager, cache_ttl_seconds=settings.auth_cache_ttl_seconds)
+
+
+FALLBACK_PROVIDER_MODELS: dict[str, list[str]] = {
+    "groq": [
+        "openai/gpt-oss-120b",
+        "llama-3.1-8b-instant",
+        "llama-3.3-70b-versatile",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "qwen/qwen3-32b",
+    ],
+    "openrouter": [
+        "openai/gpt-oss-120b",
+        "google/gemma-2-9b-it:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "meta-llama/llama-3.3-70b-instruct",
+        "qwen/qwen-2.5-72b-instruct",
+        "mistralai/mistral-7b-instruct:free",
+    ],
+    "cerebras": [
+        "gpt-oss-120b",
+        "llama3.1-8b",
+        "llama-3.3-70b",
+        "qwen-3-32b",
+    ],
+    "huggingface": [
+        "openai/gpt-oss-120b:fastest",
+        "Qwen/Qwen3-4B-Thinking-2507:fastest",
+        "Qwen/Qwen2.5-72B-Instruct:fastest",
+        "meta-llama/Llama-3.1-8B-Instruct:fastest",
+        "mistralai/Mistral-7B-Instruct-v0.3:fastest",
+    ],
+    "gemini": [
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro",
+    ],
+}
 
 # Create dependency function
 
@@ -118,60 +174,87 @@ async def health() -> dict[str, object]:
 
 
 @app.get("/v1/models")
-async def models(auth_info: dict = Depends(optional_verify_api_key)) -> dict[str, object]:
-    return {
-        "object": "list",
-        "data": [
-            {
-                "id": settings.groq_model,
-                "object": "model",
-                "owned_by": "groq"
-            },
-            {
-                "id": settings.openrouter_model,
-                "object": "model",
-                "owned_by": "openrouter"
-            },
-            {
-                "id": settings.cerebras_model,
-                "object": "model",
-                "owned_by": "cerebras"
-            },
-            {
-                "id": settings.hf_model,
-                "object": "model",
-                "owned_by": "huggingface"
-            },
-            {
-                "id": settings.gemini_model,
-                "object": "model",
-                "owned_by": "gemini"
-            },
-            {
-                "id": "auto",
-                "object": "model",
-                "owned_by": "openbalancer"
-            },
-            {
-                "id": "auto:small",
-                "object": "model",
-                "owned_by": "openbalancer"
-            },
-            {
-                "id": "auto:large",
-                "object": "model",
-                "owned_by": "openbalancer"
-            },
-        ],
-    }
+async def models(
+    auth_info: dict = Depends(optional_verify_api_key),
+    max_per_provider: int = Query(default=100, ge=1, le=500),
+) -> dict[str, object]:
+    request_router = router_for_auth(auth_info)
+    data: list[dict[str, object]] = [
+        {
+            "id": "auto",
+            "object": "model",
+            "owned_by": "openbalancer",
+            "openbalancer": {"type": "routing_alias", "profile": "default"},
+        },
+        {
+            "id": "auto:small",
+            "object": "model",
+            "owned_by": "openbalancer",
+            "openbalancer": {"type": "routing_alias", "profile": "small"},
+        },
+        {
+            "id": "auto:large",
+            "object": "model",
+            "owned_by": "openbalancer",
+            "openbalancer": {"type": "routing_alias", "profile": "large"},
+        },
+    ]
+
+    seen = {model["id"] for model in data}
+    for provider_name, provider in request_router.providers.items():
+        if not provider.available:
+            continue
+
+        source = "live"
+        try:
+            model_ids = await provider.list_models()
+        except ProviderError:
+            source = "fallback"
+            model_ids = []
+
+        if not model_ids:
+            source = "fallback"
+            model_ids = FALLBACK_PROVIDER_MODELS.get(provider_name, [])
+
+        for raw_model_id in _unique_model_ids(model_ids)[:max_per_provider]:
+            qualified_id = f"{provider_name}/{raw_model_id}"
+            if qualified_id in seen:
+                continue
+            seen.add(qualified_id)
+            data.append(
+                {
+                    "id": qualified_id,
+                    "object": "model",
+                    "owned_by": provider_name,
+                    "openbalancer": {
+                        "provider": provider_name,
+                        "provider_model": raw_model_id,
+                        "source": source,
+                    },
+                }
+            )
+
+    return {"object": "list", "data": data}
+
+
+def _unique_model_ids(model_ids: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for model_id in model_ids:
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        unique.append(model_id)
+    return unique
 
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, auth_info: dict = Depends(verify_api_key)):
+    request_router = router_for_auth(auth_info)
     try:
         if request.stream:
-            return StreamingResponse(router.stream_chat(request), media_type="text/event-stream")
-        result = await router.chat(request)
+            return StreamingResponse(request_router.stream_chat(request), media_type="text/event-stream")
+        result = await request_router.chat(request)
         return result.payload
     except ProviderError as exc:
         return JSONResponse(

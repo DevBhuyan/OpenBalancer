@@ -1,6 +1,6 @@
 # OpenBalancer [WhitePaper](https://www.overleaf.com/read/kfwpbhjjyjrc#1c8936)
 
-OpenBalancer is an open-source LLM routing and load-balancing platform designed to maximize free-tier and low-cost AI inference providers.
+[OpenBalancer](https://openbalancer.up.railway.app/) is an open-source LLM routing and load-balancing platform designed to maximize free-tier and low-cost AI inference providers.
 
 This repository now contains a working MVP:
 

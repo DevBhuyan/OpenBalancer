@@ -1,222 +1,375 @@
-# OpenBalancer [WhitePaper](https://www.overleaf.com/read/kfwpbhjjyjrc#1c8936)
+# OpenBalancer
 
-[OpenBalancer](https://openbalancer.up.railway.app/) is an open-source LLM routing and load-balancing platform designed to maximize free-tier and low-cost AI inference providers.
+> **Aggregate multiple AI providers into a single OpenAI-compatible endpoint.**
 
-This repository now contains a working MVP:
+OpenBalancer is an **open-source AI inference orchestration platform** that unifies cloud and self-hosted LLM providers behind a single API. It provides intelligent routing, automatic failover, provider health monitoring, multi-user credential management, and an OpenAI-compatible interface while allowing users to securely bring their own provider API keys.
 
-* OpenAI-compatible `POST /v1/chat/completions`
-* Provider fallback routing
-* Multiple routing policies
-* Runtime provider health state
-* `GET /health`
-* `GET /v1/models`
-* Adapters for Groq, OpenRouter, Hugging Face, Cerebras, and Gemini
+**🌐 [Live Demo](https://openbalancer.up.railway.app/dashboard)**
+**📄 [Whitepaper](https://www.overleaf.com/read/kfwpbhjjyjrc#1c8936)**
 
-## Quick Start
+---
 
-Install dependencies:
+# Dashboard
+
+> <img width="1124" height="929" alt="613293772-59c96729-1d1f-473f-88d4-e8546df21f4b" src="https://github.com/user-attachments/assets/dc139b1a-9a34-45c6-9274-b06918781998" />
+> Dashboard Overview
+
+
+OpenBalancer includes a built-in web dashboard for managing providers, credentials, API keys, and available models.
+
+Features include:
+
+* User authentication
+* Secure provider credential management
+* OpenBalancer API key generation
+* Provider health monitoring
+* Available model browser
+* Language-specific SDK quickstarts
+* Multi-user isolation
+
+---
+
+# Why OpenBalancer?
+
+Modern AI applications rarely rely on a single provider.
+
+Developers often juggle:
+
+* Groq
+* OpenRouter
+* Gemini
+* Hugging Face
+* Cerebras
+* TogetherAI
+* Ollama
+* vLLM
+
+Each provider has different:
+
+* Rate limits
+* Pricing
+* Latency
+* Available models
+* Reliability
+
+OpenBalancer abstracts these differences away, allowing applications to interact with a single OpenAI-compatible endpoint while intelligently routing requests across multiple providers.
+
+---
+
+# Architecture
+
+> **[Screenshot Placeholder – Architecture Diagram]**
+
+```
+                 Browser
+                     │
+             Dashboard (Jinja2)
+                     │
+              Authentication
+                     │
+           OpenBalancer API
+                     │
+              Routing Engine
+                     │
+      +--------------+--------------+
+      │              │              │
+    Groq       OpenRouter      Gemini
+      │              │              │
+      └──────────────┴──────────────┘
+          Additional Providers
+```
+
+---
+
+# Key Features
+
+## OpenAI Compatible
+
+Drop-in replacement for OpenAI APIs.
+
+Simply change your base URL.
+
+Compatible with:
+
+* OpenAI SDK
+* LiteLLM
+* LangChain
+* Direct HTTP clients
+
+---
+
+## Multi-User Platform
+
+Each user receives:
+
+* Secure authentication
+* Isolated provider credentials
+* Personal OpenBalancer API key
+* Independent routing decisions
+
+Users never share provider credentials.
+
+---
+
+## Intelligent Routing
+
+Built-in routing policies:
+
+* `balanced`
+* `fastest`
+* `stable`
+* `fallback`
+* `cheapest`
+
+Routing decisions consider:
+
+* Provider health
+* Latency
+* Quotas
+* Failures
+* Cost
+* Cooldown state
+
+---
+
+## Automatic Failover
+
+If a provider becomes unavailable or reaches quota limits, OpenBalancer automatically retries using alternative providers whenever possible.
+
+---
+
+## Supported Providers
+
+### Cloud
+
+* Groq
+* OpenRouter
+* Gemini
+* Cerebras
+* Hugging Face
+* TogetherAI *(planned)*
+* Fireworks *(planned)*
+* DeepInfra *(planned)*
+
+### Self Hosted
+
+* Ollama *(planned)*
+* vLLM *(planned)*
+* Text Generation Inference *(planned)*
+* llama.cpp *(planned)*
+
+---
+
+# Dashboard Preview
+
+> <img width="1124" height="929" alt="image" src="https://github.com/user-attachments/assets/864464d7-2edc-4be8-839b-3c1267afb0c0" />
+> Provider Management
+
+Manage provider API keys directly from the dashboard.
+
+* Groq
+* OpenRouter
+* Gemini
+* Cerebras
+* Hugging Face
+
+---
+
+> <img width="1124" height="929" alt="image" src="https://github.com/user-attachments/assets/83d8f8f8-b389-4db3-8f64-6e4ed6924a9d" />
+> Available Models
+
+Browse models aggregated from connected providers.
+
+---
+
+> <img width="1122" height="645" alt="613295525-98b128ba-ba7c-45e3-9322-d5815a1efbec" src="https://github.com/user-attachments/assets/b43c512f-d03b-4a3c-951b-0944ce87ff72" />
+> SDK Quickstarts
+
+Generate ready-to-use examples for:
+
+* cURL
+* Python Requests
+* OpenAI SDK
+* TypeScript
+
+---
+
+# Quick Start
+
+Clone the repository
+
+```bash
+git clone https://github.com/DevBhuyan/OpenBalancer.git
+
+cd OpenBalancer
+```
+
+Install dependencies
 
 ```bash
 python -m pip install -e ".[dev]"
 ```
 
-Run the API:
+Run the server
 
 ```bash
 python -m openbalancer
 ```
 
-Send a request:
+---
+
+## Configure Provider Keys
+
+OpenBalancer supports environment variables:
+
+```text
+GROQ_API_KEY
+OPENROUTER_API_KEY
+CEREBRAS_API_KEY
+GEMINI_API_KEY
+HF_API_KEY
+```
+
+or provider credentials through the hosted dashboard.
+
+---
+
+## Send a Request
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [{"role": "user", "content": "Say hello from OpenBalancer"}]
-  }'
+-H "Content-Type: application/json" \
+-d '{
+  "model":"auto",
+  "messages":[
+    {
+      "role":"user",
+      "content":"Hello!"
+    }
+  ]
+}'
 ```
 
-Force a provider:
+---
 
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "groq",
-    "model": "auto",
-    "messages": [{"role": "user", "content": "Use Groq through OpenBalancer"}]
-  }'
-```
+# Routing Policies
 
-The MVP loads credentials from environment variables first, then falls back to files in `quickstart_curls_and_api_keys`.
+Automatic model selection:
 
-Supported environment variables:
+* `auto`
+* `auto:small`
+* `auto:large`
 
-* `GROQ_API_KEY`
-* `OPENROUTER_API_KEY`
-* `CEREBRAS_API_KEY`
-* `GEMINI_API_KEY` or `GOOGLE_API_KEY`
-* `HF_API_KEY` or `HF_TOKEN`
-* `OPENROUTER_ARTIFICIAL_MAX_CONCURRENT` - defaults to `5`; set to `0` to disable the test limiter
-* `OPENROUTER_ARTIFICIAL_RPM` - defaults to `0`; set a positive value to simulate an OpenRouter requests-per-minute cap
-* `ROUTER_MAX_WAIT_SECONDS` - defaults to `30`; how long one request may wait/retry before failing
-* `ROUTER_RETRY_SLEEP_SECONDS` - defaults to `0.15`; minimum sleep between retry rounds
-* `PROVIDER_COOLDOWN_SECONDS` - defaults to `2`; cooldown for rate-limit/queue errors
-* `PROVIDER_UNAVAILABLE_COOLDOWN_SECONDS` - defaults to `5`; cooldown for temporary provider unavailable errors
+Available routing modes:
 
-## Routing Policies
+| Policy   | Description               |
+| -------- | ------------------------- |
+| fallback | Provider priority order   |
+| fastest  | Lowest observed latency   |
+| stable   | Lowest failure rate       |
+| balanced | Latency + failures + cost |
+| cheapest | Lowest configured cost    |
 
-Use `model: "auto"` to let OpenBalancer choose the provider-specific default model.
+---
 
-Automatic model profiles:
+# Benchmarks
 
-* `auto` - provider default
-* `auto:small` - smaller/lighter provider model where configured
-* `auto:large` - larger provider model where configured
+> **[Screenshot Placeholder – Benchmark Graph]**
 
-Routing modes:
+Example benchmark scenarios:
 
-* `fallback` - configured order: OpenRouter, Groq, Hugging Face, Cerebras, Gemini
-* `fastest` - lowest observed successful latency
-* `cheapest` - lowest configured cost rank
-* `stable` - lowest observed failure rate and no active cooldown
-* `slow_and_stable` - alias for `stable`
-* `balanced` - blends cooldown, failure rate, latency, and cost rank
+* Capacity aggregation
+* Provider failover
+* Routing policy comparison
+* Concurrent load testing
+* Multi-user isolation
 
-Example:
-
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto:small",
-    "routing": "stable",
-    "messages": [{"role": "user", "content": "Say hello from a stable small model"}]
-  }'
-```
-
-## Load Balancing Test
-
-OpenRouter has an artificial limiter enabled by default so concurrent test traffic can spill over to other providers.
-The default fallback order is OpenRouter first, then Groq, Hugging Face, Cerebras, and Gemini.
-When all providers are saturated, OpenBalancer waits and retries until `ROUTER_MAX_WAIT_SECONDS` is reached.
-
-Run:
+Run the benchmark suite:
 
 ```bash
 python clients/load_test.py
 ```
 
-Check limiter state:
+---
 
-```bash
-curl http://localhost:8000/health
+# API
+
+### Chat Completions
+
 ```
-
-## Vision
-
-Developers should not need to manually switch between Gemini, Groq, OpenRouter, Cerebras, HuggingFace, TogetherAI, Ollama, and other providers.
-
-OpenBalancer automatically routes requests based on:
-
-* Model capabilities
-* Available quota
-* Rate limits
-* Token limits
-* Latency
-* Cost
-* Reliability
-
-## Features
-
-### Unified API
-
-Compatible with OpenAI Chat Completions API.
-
-```http
 POST /v1/chat/completions
 ```
 
-### Intelligent Routing
+### Models
 
-Route requests according to:
+```
+GET /v1/models
+```
 
-* Fastest provider
-* Lowest cost
-* Highest remaining quota
-* Required capabilities
-* Custom user policies
+### Health
 
-### Provider Support
+```
+GET /health
+```
 
-Cloud Providers:
+---
 
-* Gemini
-* Groq
-* OpenRouter
-* Cerebras
-* HuggingFace
-* TogetherAI
-* Fireworks
-* DeepInfra
+# Technology Stack
 
-Self Hosted:
-
-* Ollama
-* vLLM
-* TGI
-* llama.cpp
-
-### Reliability
-
-* Automatic retries
-* Circuit breakers
-* Provider health checks
-* Fallback routing
-
-### Quota Management
-
-Track:
-
-* RPM
-* TPM
-* Daily quotas
-* Concurrent requests
-
-### Observability
-
-Prometheus metrics:
-
-* Request count
-* Provider latency
-* Success rate
-* Token consumption
-* Quota utilization
-
-## Architecture
-
-Client -> API Gateway -> Router -> Quota Manager -> Provider Adapter -> Provider
-
-## Technology Stack
-
-Backend:
+### Backend
 
 * Python
 * FastAPI
 * AsyncIO
 
-Storage:
+### Frontend
 
-* Redis
-* PostgreSQL
+* HTML
+* CSS
+* JavaScript
+* Jinja2 Templates
 
-Observability:
+### Storage
 
-* Prometheus
-* Grafana
+* SQLite
+* PostgreSQL *(planned)*
 
-Deployment:
+### Deployment
 
-* Docker
-* Kubernetes
+* Uvicorn
+* Docker *(planned)*
+* Kubernetes *(planned)*
+
+---
+
+# Roadmap
+
+* [x] OpenAI-compatible API
+* [x] Intelligent routing
+* [x] Automatic failover
+* [x] Multi-user authentication
+* [x] Provider credential management
+* [x] Web dashboard
+* [x] Hosted deployment
+* [ ] PostgreSQL migration
+* [ ] Usage analytics
+* [ ] Dynamic provider scoring
+* [ ] Team workspaces
+* [ ] Cost optimization
+* [ ] Ollama / vLLM integration
+* [ ] Prometheus metrics
+* [ ] Kubernetes deployment
+
+---
+
+# Contributing
+
+Contributions, feature requests, and bug reports are welcome.
+
+Feel free to open an issue or submit a pull request.
+
+---
+
+# License
+
+Apache 2.0 License.

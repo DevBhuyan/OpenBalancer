@@ -54,6 +54,38 @@ Each provider has different:
 
 OpenBalancer abstracts these differences away, allowing applications to interact with a single OpenAI-compatible endpoint while intelligently routing requests across multiple providers.
 
+_Why shouldn't I just use Groq directly?_
+<img width="768" height="432" alt="Successful requests under concurrent load" src="https://github.com/user-attachments/assets/24147867-1b7a-4111-8474-293dde26565f" />
+| Configuration    | Successful |  Failed | Success Rate |
+| ---------------- | ---------: | ------: | -----------: |
+| Groq             |        140 |     360 |        28.0% |
+| OpenRouter       |        254 |     246 |        50.8% |
+| **OpenBalancer** |    **291** | **209** |    **58.2%** |
+
+
+<img width="768" height="432" alt="Provider utilization" src="https://github.com/user-attachments/assets/e492367a-293b-4b67-bd2f-420ec864b865" />
+
+| Provider     | Requests |
+| ------------ | -------: |
+| OpenRouter   |      139 |
+| Groq         |      110 |
+| Hugging Face |       30 |
+| Cerebras     |       12 |
+
+
+## What differentiates OpenBalancer from other providers?
+| Feature                        | Direct Provider | OpenBalancer |
+| ------------------------------ | :-------------: | :----------: |
+| OpenAI-compatible API          |        ✅        |       ✅      |
+| Automatic failover             |        ❌        |       ✅      |
+| Multi-provider routing         |        ❌        |       ✅      |
+| Provider health monitoring     |        ❌        |       ✅      |
+| Routing policies               |        ❌        |       ✅      |
+| Multi-user support             |        ❌        |       ✅      |
+| Provider credential management |        ❌        |       ✅      |
+| Dashboard                      |        ❌        |       ✅      |
+| Vendor lock-in                 |       High      |     None     |
+
 ---
 
 # Architecture
@@ -290,7 +322,9 @@ Available routing modes:
 
 # Benchmarks
 
-> **[Screenshot Placeholder – Benchmark Graph]**
+> <img width="768" height="432" alt="Successful requests under concurrent load" src="https://github.com/user-attachments/assets/7dd934c5-0097-4d62-8f35-8e509a26a313" />
+
+> Benchmark Graph
 
 Example benchmark scenarios:
 

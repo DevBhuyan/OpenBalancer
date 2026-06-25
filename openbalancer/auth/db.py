@@ -491,12 +491,40 @@ class DatabaseManager:
         except Exception as e:
             raise DatabaseError(f"Failed to retrieve user API keys: {str(e)}")
     
+    def regenerate_user_openbalancer_key(
+        self,
+        user_id: str,
+        key_hash: str,
+        openbalancer_api_key: str,
+    ) -> Optional[UserAPIKey]:
+        """Replace a user's OpenBalancer API key while keeping provider credentials."""
+        try:
+            session = self.get_session()
+            try:
+                user_api_key = session.query(UserAPIKey).filter(
+                    UserAPIKey.user_id == user_id,
+                    UserAPIKey.enabled == True,
+                ).first()
+                if not user_api_key:
+                    return None
+                user_api_key.openbalancer_key_hash = key_hash
+                user_api_key.openbalancer_api_key = openbalancer_api_key
+                user_api_key.last_used = None
+                session.commit()
+                session.expunge(user_api_key)
+                return user_api_key
+            finally:
+                session.close()
+        except Exception as e:
+            raise DatabaseError(f"Failed to regenerate user API key: {str(e)}")
+
     def update_user_provider_credentials(
         self,
         user_id: str,
         provider_credentials: dict,
         key_hash: str | None = None,
         openbalancer_api_key: str | None = None,
+        merge: bool = False,
     ) -> Optional[UserAPIKey]:
         """Update provider credentials for a user's active API key.
         
@@ -517,6 +545,10 @@ class DatabaseManager:
                     UserAPIKey.enabled == True
                 ).first()
                 if user_api_key:
+                    if merge:
+                        existing = json.loads(user_api_key.provider_credentials or "{}")
+                        existing.update(provider_credentials)
+                        provider_credentials = existing
                     user_api_key.provider_credentials = json.dumps(provider_credentials)
                     if key_hash:
                         user_api_key.openbalancer_key_hash = key_hash

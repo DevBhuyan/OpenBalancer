@@ -1,0 +1,15 @@
+{
+  "requests": 50,
+  "success": 0,
+  "failure": 50,
+  "success_rate": 0.0,
+  "elapsed": 1.37,
+  "rps": 36.52,
+  "avg_latency_ms": 263.24,
+  "p50_ms": 189.95,
+  "p95_ms": 522.42,
+  "p99_ms": 621.21,
+  "providers": {
+    "exception": 50
+  }
+}

@@ -17,6 +17,8 @@ from openbalancer.auth import (
     hash_api_key,
 )
 from openbalancer.routers.user_auth import get_current_user, get_db_manager
+from openbalancer.user_router import router_for_credentials
+from openbalancer.providers import ProviderError
 
 
 # Request/Response models
@@ -111,24 +113,28 @@ router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
 @router.get("/providers", response_model=list[ProviderResponse])
-async def get_providers(current_user: User = Depends(get_current_user)) -> list[ProviderResponse]:
-    """Get list of available providers with their connection status.
-    
-    Args:
-        current_user: The authenticated user
-        
-    Returns:
-        List of ProviderResponse with provider information
-    """
-    # For now, return hardcoded list of providers
-    # In the future, this could be fetched from /health endpoint
+async def get_providers(
+    current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_db_manager),
+) -> list[ProviderResponse]:
+    """Get list of available providers with connection status for the current user."""
+    provider_creds: dict[str, str] = {}
+    user_api_keys = db.get_user_api_keys(current_user.id)
+    if user_api_keys:
+        provider_creds = json.loads(user_api_keys[0].provider_credentials or "{}")
+
+    user_router = router_for_credentials(provider_creds or None)
+    health_map = {item.name: item for item in user_router.health()}
+
     providers = []
     for provider_key, provider_info in AVAILABLE_PROVIDERS.items():
+        env_var = provider_info["env_var"]
+        health = health_map.get(provider_key)
         providers.append(ProviderResponse(
             name=provider_key,
             display_name=provider_info["display_name"],
-            has_api_key=False,  # Will be updated when we check user's credentials
-            healthy=None  # Will be fetched from /health endpoint
+            has_api_key=bool(provider_creds.get(env_var)),
+            healthy=health.healthy if health else None,
         ))
     return providers
 
@@ -219,6 +225,7 @@ async def update_user_provider_keys(
             provider_creds,
             key_hash=key_hash,
             openbalancer_api_key=api_key,
+            merge=True,
         )
     else:
         # Create new API key for user
@@ -281,30 +288,98 @@ async def get_user_openbalancer_key(
     )
 
 
+@router.post("/user/openbalancer-key/regenerate", response_model=OpenBalancerKeyResponse)
+async def regenerate_openbalancer_key(
+    current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_db_manager),
+) -> OpenBalancerKeyResponse:
+    """Revoke the current OpenBalancer key and issue a fresh one."""
+    user_api_keys = db.get_user_api_keys(current_user.id)
+    if not user_api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not have an OpenBalancer API key yet. Please add provider credentials first.",
+        )
+
+    new_key = generate_api_key()
+    new_hash = hash_api_key(new_key)
+    user_api_key = db.regenerate_user_openbalancer_key(
+        current_user.id,
+        new_hash,
+        new_key,
+    )
+    if not user_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not have an OpenBalancer API key yet.",
+        )
+
+    from openbalancer.app import api_key_validator
+    api_key_validator.clear_cache()
+
+    return OpenBalancerKeyResponse(
+        api_key=new_key,
+        created_at=user_api_key.created_at.isoformat(),
+        last_used=None,
+    )
+
+
 @router.get("/providers/health")
-async def get_provider_health(current_user: User = Depends(get_current_user)) -> dict:
-    """Get health status of all providers.
-    
-    This endpoint calls the main /health endpoint and returns provider status.
-    
-    Args:
-        current_user: The authenticated user
-        
-    Returns:
-        Dictionary with provider health information
-    """
-    # In a real implementation, this would call the /health endpoint
-    # For now, return a placeholder
-    return {
-        "status": "ok",
-        "providers": [
-            {"name": "groq", "status": "healthy"},
-            {"name": "openrouter", "status": "healthy"},
-            {"name": "cerebras", "status": "healthy"},
-            {"name": "gemini", "status": "degraded"},
-            {"name": "huggingface", "status": "healthy"},
-        ]
-    }
+async def get_provider_health(
+    current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_db_manager),
+) -> dict:
+    """Get health status of providers using the current user's credentials."""
+    provider_creds: dict[str, str] = {}
+    user_api_keys = db.get_user_api_keys(current_user.id)
+    if user_api_keys:
+        provider_creds = json.loads(user_api_keys[0].provider_credentials or "{}")
+
+    user_router = router_for_credentials(provider_creds or None)
+    providers = []
+    for item in user_router.health():
+        status_label = "healthy" if item.healthy else "unavailable"
+        if item.available and not item.healthy:
+            status_label = "degraded"
+        providers.append({
+            "name": item.name,
+            "status": status_label,
+            "available": item.available,
+        })
+
+    overall = "ok" if any(p["status"] == "healthy" for p in providers) else "degraded"
+    return {"status": overall, "providers": providers}
+
+
+@router.get("/models")
+async def get_user_models(
+    current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_db_manager),
+    max_per_provider: int = 20,
+) -> dict:
+    """List models available to the current user, grouped by provider."""
+    provider_creds: dict[str, str] = {}
+    user_api_keys = db.get_user_api_keys(current_user.id)
+    if user_api_keys:
+        provider_creds = json.loads(user_api_keys[0].provider_credentials or "{}")
+
+    user_router = router_for_credentials(provider_creds or None)
+    from openbalancer.app import FALLBACK_PROVIDER_MODELS
+
+    grouped: dict[str, list[str]] = {}
+    for provider_name, provider in user_router.providers.items():
+        if not provider.available:
+            continue
+        model_ids: list[str] = []
+        try:
+            model_ids = await provider.list_models()
+        except ProviderError:
+            model_ids = []
+        if not model_ids:
+            model_ids = FALLBACK_PROVIDER_MODELS.get(provider_name, [])
+        grouped[provider_name] = model_ids[:max_per_provider]
+
+    return {"providers": grouped}
 
 
 @router.get("/quickstart-code")

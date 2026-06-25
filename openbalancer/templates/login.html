@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Login · OpenBalancer{% endblock %}
+{% block body %}
+<main class="auth-page">
+  <section class="card auth-card">
+    <h1>OpenBalancer</h1>
+    <p class="muted">Sign in to manage provider keys and your API key.</p>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" class="stack">
+      <label>
+        Email
+        <input type="email" name="email" required autocomplete="email">
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button type="submit" class="btn primary">Log in</button>
+    </form>
+
+    <form method="post" action="/register" class="stack secondary-form">
+      <p class="muted">Need an account?</p>
+      <label>
+        Email
+        <input type="email" name="email" required autocomplete="email">
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" required autocomplete="new-password" minlength="8">
+      </label>
+      <button type="submit" class="btn">Create account</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

@@ -15,31 +15,50 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 from config import get_api_headers
+import urllib3
+
+# Turn off the specific InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 provider_counts = Counter()
 failure_counts = Counter()
 api_headers = get_api_headers()
+TARGET_URL = "https://192.168.1.8:8000/v1/chat/completions"
 
 
-def single_request(i):
+def single_request(i,
+                   routing=None,
+                   provider=None):
+
+    payload = {
+        "model": "auto",
+        "messages": [
+            {
+                "role": "user",
+                "content": f"Say hello #{i}"
+            }
+        ],
+        "max_completion_tokens": 64
+    }
+
+    if routing:
+        payload["routing"] = routing
+
+    if provider:
+        payload["provider"] = provider
+
+    start = perf_counter()
 
     response = requests.post(
-        "https://192.168.1.5:8000/v1/chat/completions",
-        json={
-            "model": "auto",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": f"Say hello #{i}"
-                }
-            ],
-            "max_completion_tokens": 64
-        },
+        TARGET_URL,
+        json=payload,
         headers=api_headers,
         timeout=120,
         verify=False
     )
+
+    latency = perf_counter() - start
 
     content_type = response.headers.get("content-type", "")
     try:
@@ -52,6 +71,7 @@ def single_request(i):
             "attempted_providers": [],
             "content_type": content_type,
             "body": response.text[:500],
+            "latency": latency
         }
 
     return {
@@ -61,11 +81,14 @@ def single_request(i):
         "attempted_providers": payload.get("openbalancer", {}).get("attempted_providers", []),
         "content_type": content_type,
         "body": response.text[:500],
+        "latency": latency
     }
 
 
 def load_test(n: int = 100,
-              max_workers: int = 50):
+              max_workers: int = 50,
+              routing: str = None,
+              provider: str = None):
 
     max_workers = min(max_workers, n)
 
@@ -78,7 +101,10 @@ def load_test(n: int = 100,
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
 
         futures = [
-            executor.submit(single_request, i)
+            executor.submit(single_request,
+                            i,
+                            routing,
+                            provider)
             for i in range(n)
         ]
 
@@ -157,6 +183,13 @@ if __name__ == "__main__":
         description="Run concurrent requests against OpenBalancer.")
     parser.add_argument("requests", nargs="?", type=int, default=50)
     parser.add_argument("workers", nargs="?", type=int, default=500)
+    parser.add_argument("--routing", default=None)
+    parser.add_argument("--provider", default=None)
     args = parser.parse_args()
 
-    load_test(args.requests, args.workers)
+    load_test(
+        args.requests,
+        args.workers,
+        args.routing,
+        args.provider
+    )

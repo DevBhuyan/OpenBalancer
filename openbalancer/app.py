@@ -25,8 +25,13 @@ from openbalancer.auth import (
     bootstrap_api_key,
     verify_api_key_dependency,
 )
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 from openbalancer.routers.user_auth import router as auth_router
 from openbalancer.routers.dashboard import router as dashboard_router
+from openbalancer.user_router import router_for_credentials
+from openbalancer.web.routes import router as web_router
 
 
 settings = get_settings()
@@ -35,17 +40,7 @@ router = LLMRouter(settings)
 
 def router_for_auth(auth_info: dict) -> LLMRouter:
     """Use user-provided credentials for authenticated BYOK requests."""
-    provider_credentials = auth_info.get("provider_credentials")
-    if not provider_credentials:
-        return router
-
-    request_settings = settings.model_copy()
-    request_settings.groq_api_key = provider_credentials.get("GROQ_API_KEY")
-    request_settings.openrouter_api_key = provider_credentials.get("OPENROUTER_API_KEY")
-    request_settings.cerebras_api_key = provider_credentials.get("CEREBRAS_API_KEY")
-    request_settings.gemini_api_key = provider_credentials.get("GEMINI_API_KEY")
-    request_settings.hf_api_key = provider_credentials.get("HF_API_KEY")
-    return LLMRouter(request_settings)
+    return router_for_credentials(auth_info.get("provider_credentials"))
 
 # Initialize authentication system
 db_manager = DatabaseManager(settings.auth_db_path)
@@ -128,6 +123,10 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(web_router)
+
+static_dir = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # Bootstrap API key on startup

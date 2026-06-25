@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · OpenBalancer{% endblock %}
+{% block body %}
+<header class="topbar">
+  <div class="container topbar-inner">
+    <strong>OpenBalancer</strong>
+    <div class="topbar-actions">
+      <span class="muted">{{ user.email }}</span>
+      <form method="post" action="/logout">
+        <button type="submit" class="btn ghost">Log out</button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<main class="container page">
+  <h1>Dashboard</h1>
+  <p class="muted">Configure provider keys, copy your OpenBalancer key, and browse available models.</p>
+
+  {% if message %}
+  <div class="alert alert-success">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+
+  <section class="grid two-col">
+    <article class="card">
+      <h2>Provider API Keys</h2>
+      <p class="muted">Add one or more provider keys. Existing keys are kept when you save new ones.</p>
+
+      {% if masked_keys %}
+      <div class="key-list">
+        {% for env_var, masked in masked_keys.items() %}
+        <div class="key-row">
+          <span>{{ env_var.replace('_API_KEY', '').replace('HF', 'Hugging Face') }}</span>
+          <code>{{ masked }}</code>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/dashboard/provider-keys" class="stack">
+        <label>Groq <input type="password" name="groq_api_key" placeholder="gsk_..."></label>
+        <label>OpenRouter <input type="password" name="openrouter_api_key" placeholder="sk-or-..."></label>
+        <label>Cerebras <input type="password" name="cerebras_api_key" placeholder="csk_..."></label>
+        <label>Gemini <input type="password" name="gemini_api_key" placeholder="AIzaSy..."></label>
+        <label>Hugging Face <input type="password" name="huggingface_api_key" placeholder="hf_..."></label>
+        <button type="submit" class="btn primary">Save provider keys</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h2>Your OpenBalancer API Key</h2>
+      {% if has_openbalancer_key %}
+      <div class="code-block">{{ openbalancer_key }}</div>
+      <div class="btn-row">
+        <button type="button" class="btn" onclick="copyText('{{ openbalancer_key }}')">Copy key</button>
+        <form method="post" action="/dashboard/regenerate-key" onsubmit="return confirm('Regenerate your API key? The old key will stop working immediately.')">
+          <button type="submit" class="btn danger">Regenerate key</button>
+        </form>
+      </div>
+      <p class="muted small">Created: {{ key_created }}{% if key_last_used %} · Last used: {{ key_last_used }}{% endif %}</p>
+      {% else %}
+      <p class="muted">Save at least one provider key to generate your OpenBalancer API key.</p>
+      {% endif %}
+    </article>
+  </section>
+
+  <section class="card">
+    <h2>Providers</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Key configured</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for provider in providers %}
+          <tr>
+            <td>{{ provider.display_name }}</td>
+            <td>{{ "Yes" if provider.has_api_key else "No" }}</td>
+            <td><span class="badge badge-{{ provider.status }}">{{ provider.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Available Models</h2>
+    {% if models_by_provider %}
+      {% for provider_name, models in models_by_provider.items() %}
+      <details class="model-group">
+        <summary>{{ provider_name }} ({{ models|length }})</summary>
+        <ul>
+          {% for model in models %}
+          <li><code>{{ model }}</code></li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endfor %}
+    {% else %}
+    <p class="muted">Configure provider keys to see available models.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Quickstart</h2>
+    {% if has_openbalancer_key %}
+    <div class="tab-row">
+      {% for lang in languages %}
+      <a class="tab {% if language == lang %}active{% endif %}" href="/dashboard?language={{ lang }}">{{ lang }}</a>
+      {% endfor %}
+    </div>
+    <div class="code-block pre">{{ quickstart_code }}</div>
+    <button type="button" class="btn" onclick="copyText(document.querySelector('.code-block.pre').innerText)">Copy code</button>
+    {% else %}
+    <p class="muted">Generate your OpenBalancer API key to see quickstart examples.</p>
+    {% endif %}
+  </section>
+</main>
+
+<script>
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(function () {
+    alert("Copied to clipboard");
+  }).catch(function () {
+    alert("Copy failed");
+  });
+}
+</script>
+{% endblock %}

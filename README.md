@@ -62,23 +62,38 @@ OpenBalancer abstracts these differences away, allowing applications to interact
 > Architecture Diagram
 
 ```
-                 Browser
-                     │
-             Dashboard (Jinja2)
-                     │
-              Authentication
-                     │
-           OpenBalancer API
-                     │
-              Routing Engine
-                     │
-      +--------------+--------------+
-      │              │              │
-    Groq       OpenRouter      Gemini
-      │              │              │
-      └──────────────┴──────────────┘
-          Additional Providers
+Incoming Request
+        │
+        ▼
+Authenticate User
+        │
+        ▼
+Load User Provider Keys
+        │
+        ▼
+Discover Healthy Providers
+        │
+        ▼
+Apply Routing Policy
+        │
+        ▼
+Try Selected Provider
+        │
+        │ Success?
+   ┌────┴─────┐
+   │          │
+ Yes         No
+   │          │
+   ▼          ▼
+ Return   Cooldown Provider
+ Response       │
+                ▼
+        Select Next Provider
+                │
+                ▼
+         Retry Request
 ```
+> Routing lifecycle
 
 ---
 

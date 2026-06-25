@@ -58,7 +58,8 @@ OpenBalancer abstracts these differences away, allowing applications to interact
 
 # Architecture
 
-> **[Screenshot Placeholder – Architecture Diagram]**
+> <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/09edd26d-d48e-4462-985c-cdad541ea975" />
+> Architecture Diagram
 
 ```
                  Browser

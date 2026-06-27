@@ -31,6 +31,9 @@ Features include:
 
 # Why OpenBalancer?
 
+<img width="1536" height="1024" alt="ChatGPT Image Jun 28, 2026, 02_29_50 AM" src="https://github.com/user-attachments/assets/4747daa7-3273-4843-b988-a56c6598bd26" />
+
+
 Modern AI applications rarely rely on a single provider.
 
 Developers often juggle:

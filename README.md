@@ -1,4 +1,4 @@
-# OpenBalancer
+# <img width="32" height="32" alt="favicon-32x32" src="https://github.com/user-attachments/assets/513a637b-3d02-4949-ba35-00e7c62196c4" /> OpenBalancer
 
 > **Aggregate multiple AI providers into a single OpenAI-compatible endpoint.**
 

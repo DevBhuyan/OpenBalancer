@@ -3,14 +3,20 @@
 {% block body %}
 <main class="auth-page">
   <section class="card auth-card">
-    <h1>OpenBalancer</h1>
-    <p class="muted">Sign in to manage provider keys and your API key.</p>
+    <header class="auth-brand">
+      <img src="/brand/android-chrome-192x192.png" alt="" class="auth-logo">
+      <div>
+        <h1>OpenBalancer</h1>
+        <p class="muted auth-intro">One endpoint. The right model.</p>
+      </div>
+    </header>
 
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
 
-    <form method="post" action="/login" class="stack">
+    <form method="post" action="/login" class="stack auth-panel{% if auth_mode == 'signup' %} hidden{% endif %}" id="signin-panel" role="tabpanel" aria-labelledby="signin-tab">
+      <p class="muted form-guidance">Welcome back. Enter the credentials for your existing account.</p>
       <label>
         Email
         <input type="email" name="email" required autocomplete="email">
@@ -19,11 +25,11 @@
         Password
         <input type="password" name="password" required autocomplete="current-password">
       </label>
-      <button type="submit" class="btn primary">Log in</button>
+      <button type="submit" class="btn primary">Sign in</button>
     </form>
 
-    <form method="post" action="/register" class="stack secondary-form">
-      <p class="muted">Need an account?</p>
+    <form method="post" action="/register" class="stack auth-panel{% if auth_mode != 'signup' %} hidden{% endif %}" id="signup-panel" role="tabpanel" aria-labelledby="signup-tab">
+      <p class="muted form-guidance">New here? Create an account to configure your providers.</p>
       <label>
         Email
         <input type="email" name="email" required autocomplete="email">
@@ -36,4 +42,19 @@
     </form>
   </section>
 </main>
+<script>
+document.querySelectorAll("[data-auth-mode]").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    var mode = tab.dataset.authMode;
+    document.querySelectorAll("[data-auth-mode]").forEach(function (item) {
+      var selected = item.dataset.authMode === mode;
+      item.classList.toggle("active", selected);
+      item.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+    document.getElementById("signin-panel").classList.toggle("hidden", mode !== "signin");
+    document.getElementById("signup-panel").classList.toggle("hidden", mode !== "signup");
+    document.querySelector("#" + mode + "-panel input").focus();
+  });
+});
+</script>
 {% endblock %}

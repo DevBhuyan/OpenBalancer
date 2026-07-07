@@ -3,7 +3,9 @@
 {% block body %}
 <header class="topbar">
   <div class="container topbar-inner">
-    <strong>OpenBalancer</strong>
+    <a href="/dashboard" class="brand-link">
+      <img src="/brand/favicon-32x32.png" alt="OpenBalancer" class="brand-logo">
+    </a>
     <div class="topbar-actions">
       <span class="muted">{{ user.email }}</span>
       <form method="post" action="/logout">

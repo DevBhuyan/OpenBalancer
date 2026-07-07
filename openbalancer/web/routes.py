@@ -238,11 +238,8 @@ def _dashboard_context(
 
 
 @router.get("/", response_class=HTMLResponse)
-async def root(request: Request, db: DatabaseManager = Depends(get_db_manager)):
-    user = _get_user(request, db)
-    if user:
-        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    return _render("login.html", {"request": request, "error": ""})
+async def root():
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -250,7 +247,7 @@ async def login_page(request: Request, db: DatabaseManager = Depends(get_db_mana
     user = _get_user(request, db)
     if user:
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    return _render("login.html", {"request": request, "error": ""})
+    return _render("login.html", {"request": request, "error": "", "auth_mode": "signin"})
 
 
 @router.post("/login")
@@ -264,7 +261,7 @@ async def login_submit(
     if not user or not PasswordHasher.verify_password(password, user.password_hash):
         return _render(
             "login.html",
-            {"request": request, "error": "Invalid email or password"},
+            {"request": request, "error": "Invalid email or password", "auth_mode": "signin"},
         )
 
     token, expires_at = JWTHandler.create_access_token(
@@ -287,7 +284,7 @@ async def register_submit(
     if db.get_user_by_email(normalized_email):
         return _render(
             "login.html",
-            {"request": request, "error": "Email is already registered"},
+            {"request": request, "error": "Email is already registered", "auth_mode": "signup"},
         )
 
     user_id = str(uuid.uuid4())

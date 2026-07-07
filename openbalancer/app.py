@@ -107,7 +107,7 @@ async def optional_verify_api_key(request: Request) -> dict:
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    docs_url="/"
+    docs_url="/docs"
 )
 
 
@@ -127,6 +127,8 @@ app.include_router(web_router)
 
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+brand_dir = Path(__file__).resolve().parent.parent / "favicon_io"
+app.mount("/brand", StaticFiles(directory=str(brand_dir)), name="brand")
 
 
 # Bootstrap API key on startup
@@ -158,9 +160,9 @@ async def request_logger(request: Request, call_next):
     return response
 
 
-@app.get("/docs", include_in_schema=False)
-def redirect_to_root():
-    return RedirectResponse(url="/")
+@app.get("/", include_in_schema=False)
+def redirect_to_dashboard():
+    return RedirectResponse(url="/dashboard", status_code=307)
 
 
 @app.get("/health")

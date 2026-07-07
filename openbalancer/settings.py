@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -86,8 +86,20 @@ class Settings(BaseSettings):
     # API Key Authentication Settings
     require_api_key: bool = True
     openbalancer_api_key: Optional[str] = None
-    auth_db_path: str = "sqlite:///./.data/openbalancer.db"
+    auth_db_path: str = Field(
+        default="sqlite:///./.data/openbalancer.db",
+        validation_alias=AliasChoices("DATABASE_URL", "AUTH_DB_PATH", "auth_db_path"),
+    )
     auth_cache_ttl_seconds: int = 300
+
+    @field_validator("auth_db_path")
+    @classmethod
+    def use_psycopg_driver(cls, value: str) -> str:
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        return value
 
     @classmethod
     def with_quickstart_defaults(cls) -> "Settings":

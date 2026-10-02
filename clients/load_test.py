@@ -24,7 +24,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 provider_counts = Counter()
 failure_counts = Counter()
 api_headers = get_api_headers()
-TARGET_URL = "https://192.168.1.8:8000/v1/chat/completions"
+TARGET_URL = "https://openbalancer.up.railway.app/v1/chat/completions"
 
 
 def single_request(i,

@@ -1,0 +1,86 @@
+"""Definitions for providers currently supported by OpenBalancer."""
+
+from openbalancer.providers.definition import ProviderDefinition
+from openbalancer.providers.gemini import GeminiProvider
+from openbalancer.providers.openai_compatible import OpenAICompatibleProvider
+from openbalancer.providers.registry import ProviderRegistry
+
+PROVIDER_DEFINITIONS = (
+    ProviderDefinition(
+        name="groq",
+        display_name="Groq",
+        adapter_factory=OpenAICompatibleProvider,
+        credential_id="GROQ_API_KEY",
+        api_key_setting="groq_api_key",
+        default_model_setting="groq_model",
+        small_model_setting="groq_small_model",
+        large_model_setting="groq_large_model",
+        base_url="https://api.groq.com/openai/v1",
+        default_model="openai/gpt-oss-120b",
+        small_model="llama-3.1-8b-instant",
+        large_model="openai/gpt-oss-120b",
+        cost_rank_setting="groq_cost_rank",
+    ),
+    ProviderDefinition(
+        name="openrouter",
+        display_name="OpenRouter",
+        adapter_factory=OpenAICompatibleProvider,
+        credential_id="OPENROUTER_API_KEY",
+        api_key_setting="openrouter_api_key",
+        default_model_setting="openrouter_model",
+        small_model_setting="openrouter_small_model",
+        large_model_setting="openrouter_large_model",
+        base_url="https://openrouter.ai/api/v1",
+        default_model="openai/gpt-oss-120b",
+        small_model="google/gemma-2-9b-it:free",
+        large_model="openai/gpt-oss-120b",
+        cost_rank_setting="openrouter_cost_rank",
+        extra_headers={},
+    ),
+    ProviderDefinition(
+        name="cerebras",
+        display_name="Cerebras",
+        adapter_factory=OpenAICompatibleProvider,
+        credential_id="CEREBRAS_API_KEY",
+        api_key_setting="cerebras_api_key",
+        default_model_setting="cerebras_model",
+        small_model_setting="cerebras_small_model",
+        large_model_setting="cerebras_large_model",
+        base_url="https://api.cerebras.ai/v1",
+        default_model="gpt-oss-120b",
+        small_model="llama3.1-8b",
+        large_model="gpt-oss-120b",
+        cost_rank_setting="cerebras_cost_rank",
+    ),
+    ProviderDefinition(
+        name="huggingface",
+        display_name="Hugging Face",
+        adapter_factory=OpenAICompatibleProvider,
+        credential_id="HF_API_KEY",
+        api_key_setting="hf_api_key",
+        default_model_setting="hf_model",
+        small_model_setting="hf_small_model",
+        large_model_setting="hf_large_model",
+        base_url="https://router.huggingface.co/v1",
+        default_model="openai/gpt-oss-120b:fastest",
+        small_model="Qwen/Qwen3-4B-Thinking-2507:fastest",
+        large_model="openai/gpt-oss-120b:fastest",
+        cost_rank_setting="hf_cost_rank",
+    ),
+    ProviderDefinition(
+        name="gemini",
+        display_name="Google Gemini",
+        adapter_factory=GeminiProvider,
+        credential_id="GEMINI_API_KEY",
+        api_key_setting="gemini_api_key",
+        default_model_setting="gemini_model",
+        small_model_setting="gemini_small_model",
+        large_model_setting="gemini_large_model",
+        default_model="gemini-flash-latest",
+        small_model="gemini-flash-lite-latest",
+        large_model="gemini-flash-latest",
+        cost_rank_setting="gemini_cost_rank",
+    ),
+)
+
+PROVIDER_REGISTRY = ProviderRegistry(PROVIDER_DEFINITIONS)

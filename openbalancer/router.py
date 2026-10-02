@@ -12,8 +12,7 @@ from openbalancer.models import (
     ProviderResult
 )
 from openbalancer.providers import (
-    GeminiProvider,
-    OpenAICompatibleProvider,
+    PROVIDER_REGISTRY,
     ProviderAdapter,
     ProviderError
 )
@@ -81,55 +80,28 @@ class LLMRouter:
         }
 
     def _build_providers(self, settings: Settings) -> dict[str, ProviderAdapter]:
-        providers: dict[str, ProviderAdapter] = {
-            "groq": OpenAICompatibleProvider(
-                name="groq",
-                base_url="https://api.groq.com/openai/v1",
-                api_key=settings.groq_api_key,
-                default_model=settings.groq_model,
-                small_model=settings.groq_small_model,
-                large_model=settings.groq_large_model,
-                timeout_seconds=settings.request_timeout_seconds,
-            ),
-            "openrouter": OpenAICompatibleProvider(
-                name="openrouter",
-                base_url="https://openrouter.ai/api/v1",
-                api_key=settings.openrouter_api_key,
-                default_model=settings.openrouter_model,
-                small_model=settings.openrouter_small_model,
-                large_model=settings.openrouter_large_model,
-                timeout_seconds=settings.request_timeout_seconds,
-                extra_headers={
-                    "HTTP-Referer": settings.openrouter_http_referer,
-                    "X-Title": settings.openrouter_app_title,
-                },
-            ),
-            "cerebras": OpenAICompatibleProvider(
-                name="cerebras",
-                base_url="https://api.cerebras.ai/v1",
-                api_key=settings.cerebras_api_key,
-                default_model=settings.cerebras_model,
-                small_model=settings.cerebras_small_model,
-                large_model=settings.cerebras_large_model,
-                timeout_seconds=settings.request_timeout_seconds,
-            ),
-            "huggingface": OpenAICompatibleProvider(
-                name="huggingface",
-                base_url="https://router.huggingface.co/v1",
-                api_key=settings.hf_api_key,
-                default_model=settings.hf_model,
-                small_model=settings.hf_small_model,
-                large_model=settings.hf_large_model,
-                timeout_seconds=settings.request_timeout_seconds,
-            ),
-            "gemini": GeminiProvider(
-                api_key=settings.gemini_api_key,
-                default_model=settings.gemini_model,
-                small_model=settings.gemini_small_model,
-                large_model=settings.gemini_large_model,
-                timeout_seconds=settings.request_timeout_seconds,
-            ),
-        }
+        providers: dict[str, ProviderAdapter] = {}
+        for definition in PROVIDER_REGISTRY.all():
+            adapter_kwargs = {
+                "api_key": getattr(settings, definition.api_key_setting),
+                "default_model": getattr(settings, definition.default_model_setting),
+                "small_model": getattr(settings, definition.small_model_setting),
+                "large_model": getattr(settings, definition.large_model_setting),
+                "timeout_seconds": settings.request_timeout_seconds,
+            }
+            if definition.base_url is not None:
+                adapter_kwargs.update(name=definition.name, base_url=definition.base_url)
+            extra_headers = dict(definition.extra_headers)
+            if definition.name == "openrouter":
+                extra_headers.update(
+                    {
+                        "HTTP-Referer": settings.openrouter_http_referer,
+                        "X-Title": settings.openrouter_app_title,
+                    }
+                )
+            if extra_headers:
+                adapter_kwargs["extra_headers"] = extra_headers
+            providers[definition.name] = definition.create_adapter(**adapter_kwargs)
         return providers
 
     def health(self) -> list[ProviderHealth]:
